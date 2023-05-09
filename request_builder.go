@@ -31,10 +31,17 @@ func (b *httpRequestBuilder) build(ctx context.Context, method, url string, requ
 		return nil, err
 	}
 
-	return http.NewRequestWithContext(
+	req, err := http.NewRequestWithContext(
 		ctx,
 		method,
 		url,
 		bytes.NewBuffer(reqBytes),
 	)
+	if err != nil {
+		return nil, err
+	}
+	if ctx.Value("x-tt-logid") != nil {
+		req.Header.Set("x-tt-logid", ctx.Value("x-tt-logid").(string))
+	}
+	return req, nil
 }
