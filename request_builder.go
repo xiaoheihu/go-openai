@@ -40,8 +40,11 @@ func (b *httpRequestBuilder) build(ctx context.Context, method, url string, requ
 	if err != nil {
 		return nil, err
 	}
-	if ctx.Value("x-tt-logid") != nil {
-		req.Header.Set("x-tt-logid", ctx.Value("x-tt-logid").(string))
+	if ctx.Value("header") != nil {
+		header := ctx.Value("header").(map[string]string)
+		for k, v := range header {
+			req.Header.Set(k, v)
+		}
 	}
 	return req, nil
 }
