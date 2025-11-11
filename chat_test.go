@@ -79,6 +79,68 @@ func TestChatCompletions(t *testing.T) {
 	checks.NoError(t, err, "CreateChatCompletion error")
 }
 
+func TestChatCompletionsWithTemp(t *testing.T) {
+	const expectedTemp = 0.42
+
+	server := test.NewTestServer()
+	server.RegisterHandler("/v1/chat/completions", func(w http.ResponseWriter, r *http.Request) {
+		t.Helper()
+
+		reqBody, err := io.ReadAll(r.Body)
+		checks.NoError(t, err, "failed reading request body")
+
+		var completionReq ChatCompletionRequest
+		err = json.Unmarshal(reqBody, &completionReq)
+		checks.NoError(t, err, "failed to unmarshal request body")
+
+		if completionReq.Temp != expectedTemp {
+			t.Fatalf("unexpected temp value: got %v, want %v", completionReq.Temp, expectedTemp)
+		}
+
+		res := ChatCompletionResponse{
+			ID:      strconv.Itoa(int(time.Now().Unix())),
+			Object:  "test-object",
+			Created: time.Now().Unix(),
+			Model:   completionReq.Model,
+			Choices: []ChatCompletionChoice{},
+			Usage: Usage{
+				PromptTokens:     0,
+				CompletionTokens: 0,
+				TotalTokens:      0,
+			},
+		}
+
+		resBytes, err := json.Marshal(res)
+		checks.NoError(t, err, "failed marshaling response")
+
+		_, err = w.Write(resBytes)
+		checks.NoError(t, err, "failed writing response")
+	})
+
+	ts := server.OpenAITestServer()
+	ts.Start()
+	defer ts.Close()
+
+	config := DefaultConfig(test.GetTestToken())
+	config.BaseURL = ts.URL + "/v1"
+	client := NewClientWithConfig(config)
+	ctx := context.Background()
+
+	req := ChatCompletionRequest{
+		Model: GPT3Dot5Turbo,
+		Messages: []ChatCompletionMessage{
+			{
+				Role:    ChatMessageRoleUser,
+				Content: "Hello!",
+			},
+		},
+		Temp: expectedTemp,
+	}
+
+	_, err := client.CreateChatCompletion(ctx, req)
+	checks.NoError(t, err, "CreateChatCompletion error")
+}
+
 // handleChatCompletionEndpoint Handles the ChatGPT completion endpoint by the test server.
 func handleChatCompletionEndpoint(w http.ResponseWriter, r *http.Request) {
 	var err error
